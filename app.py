@@ -1,46 +1,35 @@
 import os
 import sys
+import requests
 
 from flask import Flask, jsonify, request, abort, send_file
 from dotenv import load_dotenv
 from linebot import LineBotApi, WebhookParser
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
-
-from fsm import TocMachine
+from functools import partial
 from utils import send_text_message
+from relation import *
 
 load_dotenv()
 
-
-machine = TocMachine(
-    states=["user", "state1", "state2"],
-    transitions=[
-        {
-            "trigger": "advance",
-            "source": "user",
-            "dest": "state1",
-            "conditions": "is_going_to_state1",
-        },
-        {
-            "trigger": "advance",
-            "source": "user",
-            "dest": "state2",
-            "conditions": "is_going_to_state2",
-        },
-        {"trigger": "go_back", "source": ["state1", "state2"], "dest": "user"},
-    ],
-    initial="user",
-    auto_transitions=False,
-    show_conditions=True,
-)
+userMachine = {}
+DBurl = 'https://gitlab.com/ethan0150/toc-linebot-crawler/-/jobs/artifacts/main/raw/db.sqlite?job=test'
+if os.path.isfile("./db.sqlite"):
+        os.remove("./db.sqlite")
+with open('./db.sqlite', 'wb') as f:
+    f.write(requests.get(DBurl, allow_redirects=True).content)
 
 app = Flask(__name__, static_url_path="")
-
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'db.sqlite')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
 
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv("LINE_CHANNEL_SECRET", None)
 channel_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", None)
+port = os.getenv("PORT", None)
 if channel_secret is None:
     print("Specify LINE_CHANNEL_SECRET as environment variable.")
     sys.exit(1)
@@ -64,7 +53,6 @@ def callback():
         events = parser.parse(body, signature)
     except InvalidSignatureError:
         abort(400)
-
     # if event is MessageEvent and message is TextMessage, then echo text
     for event in events:
         if not isinstance(event, MessageEvent):
@@ -91,7 +79,7 @@ def webhook_handler():
         events = parser.parse(body, signature)
     except InvalidSignatureError:
         abort(400)
-
+    
     # if event is MessageEvent and message is TextMessage, then echo text
     for event in events:
         if not isinstance(event, MessageEvent):
@@ -100,21 +88,71 @@ def webhook_handler():
             continue
         if not isinstance(event.message.text, str):
             continue
-        print(f"\nFSM STATE: {machine.state}")
+        
+        uid = event.source.user_id
+
+        if uid not in userMachine:
+            userMachine[uid] = createMachine(uid=uid)
+
+        print(f"\nFSM STATE: {userMachine[uid].state}")
         print(f"REQUEST BODY: \n{body}")
-        response = machine.advance(event)
+        print(f'\n{event} {type(event)}')
+
+        response = userMachine[uid].advance(event)
         if response == False:
             send_text_message(event.reply_token, "Not Entering any State")
 
     return "OK"
 
-
 @app.route("/show-fsm", methods=["GET"])
 def show_fsm():
-    machine.get_graph().draw("fsm.png", prog="dot", format="png")
+    createMachine(uid=None).get_graph().draw("fsm.png", prog="dot", format="png")
     return send_file("fsm.png", mimetype="image/png")
 
-
 if __name__ == "__main__":
-    port = os.environ.get("PORT", 8000)
-    app.run(host="0.0.0.0", port=port, debug=True)
+    from fsm import TocMachine
+    global createMachine
+    createMachine = partial(TocMachine, 
+    states=["init", "coll", "dept", "mand", "result"],
+    transitions=[
+        {
+            "trigger": "advance",
+            "source": "init",
+            "dest": "coll",
+            "conditions": "is_entering_coll",
+        },
+        {
+            "trigger": "advance",
+            "source": "coll",
+            "dest": "dept",
+            "conditions": "is_entering_dept",
+        },
+        {
+            "trigger": "advance",
+            "source": "dept",
+            "dest": "mand",
+            "conditions": "is_entering_mand",
+        },
+        {
+            "trigger": "advance",
+            "source": ["coll", "dept", "mand"], 
+            "dest": "init",
+            "conditions": "is_returing_init"
+        },
+        {
+            "trigger": "advance",
+            "source": "mand",
+            "dest": "result",
+            "conditions": "is_entering_result",
+        },
+        {
+            "trigger": "go_init",
+            "source": "result",
+            "dest": "init",
+        },
+    ],
+    initial="init",
+    auto_transitions=False,
+    show_conditions=True
+)
+    app.run(host="0.0.0.0", port=port, debug=False)
