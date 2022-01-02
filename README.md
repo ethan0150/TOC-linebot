@@ -1,23 +1,28 @@
+﻿
 # TOC Project 2020
 
 [![Maintainability](https://api.codeclimate.com/v1/badges/dc7fa47fcd809b99d087/maintainability)](https://codeclimate.com/github/NCKU-CCS/TOC-Project-2020/maintainability)
 
 [![Known Vulnerabilities](https://snyk.io/test/github/NCKU-CCS/TOC-Project-2020/badge.svg)](https://snyk.io/test/github/NCKU-CCS/TOC-Project-2020)
 
-
-Template Code for TOC Project 2020
+Chatbot showing the courses that matches the department and the mandatoriness the user specifies in the current semester in NCKU.
 
 A Line bot based on a finite state machine
 
 More details in the [Slides](https://hackmd.io/@TTW/ToC-2019-Project#) and [FAQ](https://hackmd.io/s/B1Xw7E8kN)
 
+## How It Works
+
+Instead of integrating the web scraping code in this repository and scrape the [NCKU course website](https://course.ncku.edu.tw/) on demand, I put it in this [separate repository](https://gitlab.com/ethan0150/toc-linebot-crawler) and set Gitlab CI/CD to run it periodically (hourly). Each time the scheduled CI/CD job is done, the data scraped from the course website is stored as a SQLite file and published in the form of job artifacts, which kinda treats Gitlab CI/CD as a free file server. The linebot downloads the latest SQLite file and operates on it. There are several benefits dividing the project in this way:
+
+ - The SQLite file is like a cache, making performance much better than scraping data off the website on user's demand.
+ - Easier to debug.
+ - Avoids the bot's IP being banned by the course website, since the website is only bothered once an hour.
 ## Setup
 
 ### Prerequisite
-* Python 3.6
+* Python 3.7
 * Pipenv
-* Facebook Page and App
-* HTTPS Server
 
 #### Install Dependency
 ```sh
@@ -71,20 +76,16 @@ Or You can use [servo](http://serveo.net/) to expose local servers to the intern
 
 
 ## Finite State Machine
-![fsm](./img/show-fsm.png)
+![fsm](./fsm.png)
 
 ## Usage
-The initial state is set to `user`.
+- `init` : Initial state. Jumps to coll after the user enters "query"
+- `coll` : Lets the user choose departments of which college to display.
+- `dept` : Lets the user choose a department of the college chosen in `coll` state.
+- `mand`: Lets the user choose the mandatoriness of the courses
+- `result`: Displays the querying result. Jumps back to `init` unconditionally after the querying result has been displayed.
 
-Every time `user` state is triggered to `advance` to another state, it will `go_back` to `user` state after the bot replies corresponding message.
-
-* user
-	* Input: "go to state1"
-		* Reply: "I'm entering state1"
-
-	* Input: "go to state2"
-		* Reply: "I'm entering state2"
-
+Users can also enter "exit" at `coll`, `dept` or `mand` to go back to `init`.
 ## Deploy
 Setting to deploy webhooks on Heroku.
 
