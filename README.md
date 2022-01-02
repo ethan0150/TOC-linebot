@@ -13,11 +13,11 @@ More details in the [Slides](https://hackmd.io/@TTW/ToC-2019-Project#) and [FAQ]
 
 ## How It Works
 
-Instead of integrating the web scraping code in this repository and scrape the [NCKU course website](https://course.ncku.edu.tw/) on demand, I put it in this [separate repository](https://gitlab.com/ethan0150/toc-linebot-crawler) and set Gitlab CI/CD to run it periodically (hourly). Each time the scheduled CI/CD job is done, the data scraped from the course website is stored as a SQLite file and published in the form of job artifacts, which kinda treats Gitlab CI/CD as a free file server. The linebot downloads the latest SQLite file and operates on it. There are several benefits dividing the project in this way:
+Instead of integrating the web scraping code in this repository and scrape the [NCKU course website](https://course.ncku.edu.tw/) on demand, I put it in this [separate repository](https://gitlab.com/ethan0150/toc-linebot-crawler) and set Gitlab CI/CD to run it periodically (daily). Each time the scheduled CI/CD job is done, the data scraped from the course website is stored as a SQLite file and published in the form of job artifacts, which kinda treats Gitlab CI/CD as a free file server. The linebot downloads the latest SQLite file and operates on it. There are several benefits dividing the project in this way:
 
  - The SQLite file is like a cache, making performance much better than scraping data off the website on user's demand.
  - Easier to debug.
- - Avoids the bot's IP being banned by the course website, since the website is only bothered once an hour.
+ - Avoids the bot's IP being banned by the course website, since the website is only bothered once a day.
 ## Setup
 
 ### Prerequisite
